@@ -11,7 +11,7 @@ job "autoscaler" {
 
     network {
       port "http" {}
-      port "promtail" {}
+      // port "promtail" {}
     }
 
     task "autoscaler" {
@@ -33,40 +33,28 @@ job "autoscaler" {
         ]
       }
 
-      ## Alternatively, you could also run the Autoscaler using the exec driver
-      # driver = "exec"
-      #
-      # config {
-      #   command = "/usr/local/bin/nomad-autoscaler"
-      #   args    = ["agent", "-config", "${NOMAD_TASK_DIR}/config.hcl"]
-      # }
-      #
-      # artifact {
-      #   source      = "https://releases.hashicorp.com/nomad-autoscaler/0.3.7/nomad-autoscaler_0.3.7_linux_amd64.zip"
-      #   destination = "/usr/local/bin"
-      # }
 
       template {
         data = <<EOF
-nomad {
-  address = "http://{{env "attr.unique.network.ip-address" }}:4646"
-}
+            nomad {
+              address = "http://{{env "attr.unique.network.ip-address" }}:4646"
+            }
 
-telemetry {
-  prometheus_metrics = true
-  disable_hostname   = true
-}
+            telemetry {
+              prometheus_metrics = true
+              disable_hostname   = true
+            }
 
-apm "prometheus" {
-  driver = "prometheus"
-  config = {
-    address = "http://{{ env "attr.unique.network.ip-address" }}:9090"
-  }
-}
+            apm "prometheus" {
+              driver = "prometheus"
+              config = {
+                address = "http://{{ env "attr.unique.network.ip-address" }}:9090"
+              }
+            }
 
-strategy "target-value" {
-  driver = "target-value"
-}
+            strategy "target-value" {
+              driver = "target-value"
+            }
           EOF
 
         destination = "${NOMAD_TASK_DIR}/config.hcl"
@@ -91,73 +79,73 @@ strategy "target-value" {
       }
     }
 
-    task "promtail" {
-      driver = "docker"
+    // task "promtail" {
+    //   driver = "docker"
 
-      lifecycle {
-        hook    = "prestart"
-        sidecar = true
-      }
+    //   lifecycle {
+    //     hook    = "prestart"
+    //     sidecar = true
+    //   }
 
-      config {
-        image = "grafana/promtail:2.6.1"
-        ports = ["promtail"]
+    //   config {
+    //     image = "grafana/promtail:2.6.1"
+    //     ports = ["promtail"]
 
-        args = [
-          "-config.file",
-          "local/promtail.yaml",
-        ]
-      }
+    //     args = [
+    //       "-config.file",
+    //       "local/promtail.yaml",
+    //     ]
+    //   }
 
-      template {
-        data = <<EOH
-server:
-  http_listen_port: {{ env "NOMAD_PORT_promtail" }}
-  grpc_listen_port: 0
+    //   template {
+    //     data = <<EOH
+    //       server:
+    //         http_listen_port: {{ env "NOMAD_PORT_promtail" }}
+    //         grpc_listen_port: 0
 
-positions:
-  filename: /tmp/positions.yaml
+    //       positions:
+    //         filename: /tmp/positions.yaml
 
-client:
-  url: http://{{ range $i, $s := nomadService "loki" }}{{ if eq $i 0 }}{{.Address}}:{{.Port}}{{end}}{{end}}/api/prom/push
+    //       client:
+    //         url: http://{{ range $i, $s := nomadService "loki" }}{{ if eq $i 0 }}{{.Address}}:{{.Port}}{{end}}{{end}}/api/prom/push
 
-scrape_configs:
-- job_name: system
-  static_configs:
-  - targets:
-      - localhost
-    labels:
-      task: autoscaler
-      __path__: /alloc/logs/autoscaler*
-  pipeline_stages:
-  - match:
-      selector: '{task="autoscaler"}'
-      stages:
-      - regex:
-          expression: '.*policy_id=(?P<policy_id>[a-zA-Z0-9_-]+).*source=(?P<source>[a-zA-Z0-9_-]+).*strategy=(?P<strategy>[a-zA-Z0-9_-]+).*target=(?P<target>[a-zA-Z0-9_-]+).*Group:(?P<group>[a-zA-Z0-9]+).*Job:(?P<job>[a-zA-Z0-9_-]+).*Namespace:(?P<namespace>[a-zA-Z0-9_-]+)'
-      - labels:
-          policy_id:
-          source:
-          strategy:
-          target:
-          group:
-          job:
-          namespace:
-EOH
+    //       scrape_configs:
+    //       - job_name: system
+    //         static_configs:
+    //         - targets:
+    //             - localhost
+    //           labels:
+    //             task: autoscaler
+    //             __path__: /alloc/logs/autoscaler*
+    //         pipeline_stages:
+    //         - match:
+    //             selector: '{task="autoscaler"}'
+    //             stages:
+    //             - regex:
+    //                 expression: '.*policy_id=(?P<policy_id>[a-zA-Z0-9_-]+).*source=(?P<source>[a-zA-Z0-9_-]+).*strategy=(?P<strategy>[a-zA-Z0-9_-]+).*target=(?P<target>[a-zA-Z0-9_-]+).*Group:(?P<group>[a-zA-Z0-9]+).*Job:(?P<job>[a-zA-Z0-9_-]+).*Namespace:(?P<namespace>[a-zA-Z0-9_-]+)'
+    //             - labels:
+    //                 policy_id:
+    //                 source:
+    //                 strategy:
+    //                 target:
+    //                 group:
+    //                 job:
+    //                 namespace:
+    //       EOH
 
-        destination = "local/promtail.yaml"
-      }
+    //     destination = "local/promtail.yaml"
+    //   }
 
-      resources {
-        cpu    = 50
-        memory = 32
-      }
+    //   resources {
+    //     cpu    = 50
+    //     memory = 32
+    //   }
 
-      service {
-        name     = "promtail"
-        provider = "nomad"
-        port     = "promtail"
-      }
-    }
+    //   service {
+    //     name     = "promtail"
+    //     provider = "nomad"
+    //     port     = "promtail"
+    //   }
+    // }
   }
 }
